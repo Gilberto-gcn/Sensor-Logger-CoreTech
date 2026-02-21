@@ -1,0 +1,1 @@
+emcc -o quick_example.js quick_example.cpp -Wall   /home/mojogome/Documentos/raylib/src/libraylib.a     -I/home/mojogome/Documentos/raylib/src -lembind    -s EXPORT_ES6=1     -s MODULARIZE=1     -s USE_GLFW=3     -s ASYNCIFY     -DPLATFORM_WEB

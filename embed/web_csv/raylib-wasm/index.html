@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP32 Monitor Station</title>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- MathJax -->
+  <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <div class="container">
+    <header>
+      <h1>ESP32 Monitor</h1>
+      <div class="subtitle">Real-Time Sensor Dashboard</div>
+      <div class="status">
+        <span class="status-dot"></span>
+        <span id="statusText">CONECTANDO...</span>
+      </div>
+
+      <!-- Controles -->
+      <div class="controls-bar">
+        <!-- remover isso aqui -->
+        <!-- até aqui -->
+        <button onclick="sendCommand('RESET')" class="control-btn btn-yellow">
+          <span class="btn-icon">🔄</span>
+          RESET
+        </button>
+        <button onclick="exportToCSV()" class="control-btn btn-cyan">
+          <span class="btn-icon">📊</span>
+          EXPORTAR CSV
+        </button>
+      </div>
+    </header>
+
+    <!-- Métricas Principais -->
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-label">
+          <div class="metric-icon icon-humidity"></div>
+          Umidade
+        </div>
+        <div class="metric-value" id="humidityValue">--</div>
+        <div class="metric-unit">%</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-label">
+          <div class="metric-icon icon-temp"></div>
+          Temperatura
+        </div>
+        <div class="metric-value" id="temperatureValue">--</div>
+        <div class="metric-unit">°C</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-label">
+          <div class="metric-icon icon-termistor"></div>
+          Termistor ADC
+        </div>
+        <div class="metric-value" id="termistorValue">--</div>
+        <div class="metric-unit">raw</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-label">
+          <div class="metric-icon icon-termtemp"></div>
+          Temp. Termistor
+        </div>
+        <div class="metric-value" id="termistorTempValue">--</div>
+        <div class="metric-unit">°C</div>
+      </div>
+    </div>
+
+    <!-- Gráficos -->
+    <div class="charts-grid">
+      <div class="chart-container">
+        <div class="chart-title">Temperatura do Termistor × Tempo</div>
+        <div class="chart-wrapper">
+          <canvas id="termistorTempChart"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-container">
+        <div class="chart-title">Termistor ADC × Tempo</div>
+        <div class="chart-wrapper">
+          <canvas id="termistorChart"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-container">
+        <div class="chart-title">Resistência × Tempo</div>
+        <div class="chart-wrapper">
+          <canvas id="resistanceChart"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-container">
+        <div class="chart-title">Curva de Temperatura</div>
+        <div class="chart-wrapper">
+          <canvas id="temperatureCurveChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Seção de Cálculos -->
+    <div class="calculations">
+      <div class="calc-card">
+        <div class="calc-header">
+          <div class="calc-number">1</div>
+          <div class="calc-title">Conversão ADC → Tensão</div>
+        </div>
+        <div class="calc-formula">
+          $$V = \text{ADC} \times \frac{3.3}{4095}$$
+        </div>
+        <div class="calc-description">
+          Converte o valor digital do ADC (0-4095) para tensão analógica (0-3.3V).
+          O ESP32 possui um conversor ADC de 12 bits, resultando em 4096 níveis discretos.
+        </div>
+        <div class="calc-values">
+          <div class="calc-value-item">
+            <span class="calc-value-label">ADC Raw:</span>
+            <span class="calc-value-number" id="calc-adc">--</span>
+          </div>
+          <div class="calc-value-item">
+            <span class="calc-value-label">Tensão:</span>
+            <span class="calc-value-number" id="calc-voltage">--</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="calc-card">
+        <div class="calc-header">
+          <div class="calc-number">2</div>
+          <div class="calc-title">Cálculo da Resistência</div>
+        </div>
+        <div class="calc-formula">
+          $$R_{NTC} = R_{ref} \times \frac{V}{V_{CC} - V}$$
+        </div>
+        <div class="calc-description">
+          Calcula a resistência do NTC usando divisor de tensão.
+          Com R<sub>ref</sub> = 10kΩ e V<sub>CC</sub> = 3.3V,
+          a resistência varia inversamente com a temperatura.
+        </div>
+        <div class="calc-values">
+          <div class="calc-value-item">
+            <span class="calc-value-label">R<sub>ref</sub>:</span>
+            <span class="calc-value-number">10000 Ω</span>
+          </div>
+          <div class="calc-value-item">
+            <span class="calc-value-label">R<sub>NTC</sub>:</span>
+            <span class="calc-value-number" id="calc-resistance">--</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="calc-card">
+        <div class="calc-header">
+          <div class="calc-number">3</div>
+          <div class="calc-title">Equação de Steinhart-Hart</div>
+        </div>
+        <div class="calc-formula">
+          $$\frac{1}{T_K} = \frac{1}{T_0} + \frac{1}{B} \ln\left(\frac{R}{R_0}\right)$$
+        </div>
+        <div class="calc-description">
+          Modelo matemático que relaciona resistência do NTC com temperatura absoluta.
+          Utiliza B = 3950K (coeficiente beta) e T₀ = 298.15K (25°C) como referência.
+        </div>
+        <div class="calc-values">
+          <div class="calc-value-item">
+            <span class="calc-value-label">B (beta):</span>
+            <span class="calc-value-number">3950 K</span>
+          </div>
+          <div class="calc-value-item">
+            <span class="calc-value-label">T₀:</span>
+            <span class="calc-value-number">298.15 K</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="calc-card">
+        <div class="calc-header">
+          <div class="calc-number">4</div>
+          <div class="calc-title">Conversão Kelvin → Celsius</div>
+        </div>
+        <div class="calc-formula">
+          $$T_{°C} = T_K - 273.15$$
+        </div>
+        <div class="calc-description">
+          Conversão da temperatura absoluta (Kelvin) para escala Celsius.
+          O zero absoluto (0K) corresponde a -273.15°C, e cada grau Kelvin
+          equivale a um grau Celsius na variação.
+        </div>
+        <div class="calc-values">
+          <div class="calc-value-item">
+            <span class="calc-value-label">T (Kelvin):</span>
+            <span class="calc-value-number" id="calc-kelvin">--</span>
+          </div>
+          <div class="calc-value-item">
+            <span class="calc-value-label">T (Celsius):</span>
+            <span class="calc-value-number" id="calc-celsius">--</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript WARN: mudei para module se der merda é supostamente só tirar -->
+  <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+  <script type="module" src="script.js"></script>
+
+
+  <!-- <script type="module" src="teste.js"></script> -->
+
+</body>
+
+</html>
