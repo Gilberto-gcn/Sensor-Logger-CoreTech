@@ -51,6 +51,3 @@ const VCC = 3.3;
 ```
 
 Caso queira alterar algo no simulador de partículas recomendo seguir a dpcumentação do raylib, https://github.com/raysan5/raylib e do emscriptem, [https://emscripten.org/docs/index.html](https://emscripten.org/docs/index.html), o arquivo run em frontend/scrits pode te ajudar.
-# Sensor-Logger-CoreTech
-# Sensor-Logger-CoreTech
-# Sensor-Logger-CoreTech
